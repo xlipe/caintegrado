@@ -62,7 +62,7 @@ export default function HomePage() {
 
         {/* --- Botão 4: Login/Cadastro --- */}
         <a 
-          href="#" // TODO: Adicionar o link para a página de login
+          href="/login" // TODO: Adicionar o link para a página de login
           className="group rounded-2xl border border-white/20 bg-white/10 p-6 shadow-lg backdrop-blur-lg transition-all duration-300 hover:bg-white/20 hover:scale-105"
         >
           <div className="flex items-center space-x-4">
