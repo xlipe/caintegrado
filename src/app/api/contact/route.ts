@@ -24,7 +24,7 @@ export async function POST(request: Request) {
       to: [contactEmail],
       cc: [userEmail], // AQUI ESTÁ A MUDANÇA: Adicionamos o e-mail do utilizador em cópia.
       subject: `Nova Mensagem do App CA de ${userName}`,
-      reply_to: userEmail,
+      replyTo: userEmail,
       html: `
         <p>Você recebeu uma nova mensagem de <strong>${userName}</strong> (${userEmail}):</p>
         <blockquote style="border-left: 2px solid #ccc; padding-left: 1em; margin-left: 1em;">
