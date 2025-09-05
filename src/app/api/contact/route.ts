@@ -1,29 +1,38 @@
-import { NextResponse } from 'next/server';
 import { Resend } from 'resend';
+import { NextResponse } from 'next/server';
 
-// Pega a chave de API do ambiente, garantindo que ela exista.
-const resend = new Resend(process.env.RESEND_API_KEY!);
-const toEmail = process.env.CONTACT_EMAIL!;
+const resend = new Resend(process.env.RESEND_API_KEY);
+const contactEmail = process.env.CONTACT_EMAIL;
 
 export async function POST(request: Request) {
   try {
-    const { from, subject, message } = await request.json();
+    const body = await request.json();
+    const { message, userEmail, userName } = body;
+    
+    console.log('API de Contato Recebeu:', { message, userEmail, userName });
 
-    if (!from || !subject || !message) {
-      return NextResponse.json({ error: 'Todos os campos são obrigatórios.' }, { status: 400 });
+    if (!contactEmail) {
+      throw new Error('O e-mail de destino não está configurado.');
     }
 
-    if (!toEmail) {
-        console.error("Variável de ambiente CONTACT_EMAIL não configurada.");
-        return NextResponse.json({ error: 'O servidor não está configurado para receber e-mails.' }, { status: 500 });
+    if (!message || !userEmail || !userName) {
+        return NextResponse.json({ error: 'Faltam dados no formulário.' }, { status: 400 });
     }
 
     const { data, error } = await resend.emails.send({
-      from: 'Contato App CA <onboarding@resend.dev>', // Este é o remetente exigido pelo Resend no plano gratuito.
-      to: [toEmail],
-      reply_to: from, // O e-mail do usuário vai aqui, para você poder responder.
-      subject: `[App CA] - ${subject}`,
-      text: `Mensagem de: ${from}\n\n${message}`,
+      from: `Contato App CA <contato@coms.filipecarvalho.com.br>`,
+      to: [contactEmail],
+      cc: [userEmail], // AQUI ESTÁ A MUDANÇA: Adicionamos o e-mail do utilizador em cópia.
+      subject: `Nova Mensagem do App CA de ${userName}`,
+      reply_to: userEmail,
+      html: `
+        <p>Você recebeu uma nova mensagem de <strong>${userName}</strong> (${userEmail}):</p>
+        <blockquote style="border-left: 2px solid #ccc; padding-left: 1em; margin-left: 1em;">
+          <p>${message}</p>
+        </blockquote>
+        <hr>
+        <p><small>Este é um e-mail automático. Para responder, utilize a função "Responder a" do seu cliente de e-mail.</small></p>
+      `,
     });
 
     if (error) {
@@ -31,10 +40,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json(data);
-  } catch (error) {
-    console.error("Erro inesperado na API de contato:", error);
-    return NextResponse.json({ error: 'Ocorreu um erro inesperado.' }, { status: 500 });
+    return NextResponse.json({ message: 'E-mail enviado com sucesso!', data });
+
+  } catch (error: any) {
+    console.error("Erro interno na API:", error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
 

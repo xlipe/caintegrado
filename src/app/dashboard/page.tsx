@@ -1,30 +1,34 @@
-import { createClient } from '@/lib/supabaseClient';
+import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
-import DashboardClient from './DashboardClient'; // Componente do lado do cliente
+import DashboardClient from './DashboardClient';
+
+// Esta função força a página a ser dinâmica e não usar cache
+export const dynamic = 'force-dynamic';
 
 export default async function DashboardPage() {
   const supabase = createClient();
 
   const {
-    data: { session },
-  } = await supabase.auth.getSession();
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  if (!session) {
+  if (!user) {
     redirect('/login');
   }
+  
+  // Se o utilizador existe, buscamos a sessão completa para passar ao componente cliente
+  const { data: { session } } = await supabase.auth.getSession();
 
-  const { data: profile, error } = await supabase
+  const { data: profile } = await supabase
     .from('profiles')
     .select('*')
-    .eq('id', session.user.id)
+    .eq('id', user.id)
     .single();
 
-  if (error && error.code !== 'PGRST116') {
-    // PGRST116: 'No rows found' - acontece se o perfil ainda não foi criado pelo trigger
-    console.error('Erro ao buscar perfil:', error);
+  if (!session) {
+      redirect('/login');
   }
-  
-  // Passamos os dados do servidor para o componente de cliente
+
   return <DashboardClient session={session} profile={profile} />;
 }
 

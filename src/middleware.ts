@@ -1,88 +1,27 @@
-import { createServerClient, type CookieOptions } from '@supabase/ssr'
-import { NextResponse, type NextRequest } from 'next/server'
+import { type NextRequest } from 'next/server'
+import { createClient } from '@/lib/supabase/middleware'
 
 export async function middleware(request: NextRequest) {
-  let response = NextResponse.next({
-    request: {
-      headers: request.headers,
-    },
-  })
+  // Usamos o nosso novo "ajudante" para criar o cliente Supabase e a resposta
+  const { supabase, response } = createClient(request)
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        get(name: string) {
-          return request.cookies.get(name)?.value
-        },
-        set(name: string, value: string, options: CookieOptions) {
-          request.cookies.set({
-            name,
-            value,
-            ...options,
-          })
-          response = NextResponse.next({
-            request: {
-              headers: request.headers,
-            },
-          })
-          response.cookies.set({
-            name,
-            value,
-            ...options,
-          })
-        },
-        remove(name: string, options: CookieOptions) {
-          request.cookies.set({
-            name,
-            value: '',
-            ...options,
-          })
-          response = NextResponse.next({
-            request: {
-              headers: request.headers,
-            },
-          })
-          response.cookies.set({
-            name,
-            value: '',
-            ...options,
-          })
-        },
-      },
-    }
-  )
+  // Esta linha é crucial: ela atualiza a sessão do utilizador,
+  // garantindo que o cookie de autenticação está sempre válido.
+  await supabase.auth.getSession()
 
-  const {
-    data: { session },
-  } = await supabase.auth.getSession()
-
-  // Se o usuário não estiver logado e tentar acessar o dashboard, redireciona para o login
-  if (!session && request.nextUrl.pathname.startsWith('/dashboard')) {
-    return NextResponse.redirect(new URL('/login', request.url))
-  }
-
-  // Se o usuário estiver logado e tentar acessar o login, redireciona para o dashboard
-  if (session && request.nextUrl.pathname.startsWith('/login')) {
-    return NextResponse.redirect(new URL('/dashboard', request.url))
-  }
-
+  // Retornamos a resposta, que agora contém os cookies atualizados.
   return response
 }
 
 export const config = {
   matcher: [
     /*
-     * Match all request paths except for the ones starting with:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * Feel free to modify this pattern to include more paths.
+     * Faz a correspondência de todos os caminhos de pedido, exceto os que começam com:
+     * - _next/static (ficheiros estáticos)
+     * - _next/image (ficheiros de otimização de imagem)
+     * - favicon.ico (ficheiro do favicon)
      */
     '/((?!_next/static|_next/image|favicon.ico).*)',
-    '/dashboard/:path*',
-    '/login',
   ],
 }
 

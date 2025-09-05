@@ -1,156 +1,140 @@
 'use client';
 
-import { useState, FormEvent, ChangeEvent } from 'react';
-import { createClient } from '@/lib/supabaseClient';
-import { AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { useState, FormEvent } from 'react';
+import { createClient } from '@/lib/supabase/client'; // MUDANÇA IMPORTANTE AQUI
+import { AlertTriangle, CheckCircle2, ArrowLeft, Loader2 } from 'lucide-react';
+import Link from 'next/link';
 
-// Define os dois modos possíveis para o formulário
-type FormMode = 'login' | 'cadastro';
-
-const LoginPage = () => {
-  // Estado para controlar se estamos em modo Login ou Cadastro
-  const [mode, setMode] = useState<FormMode>('login');
-
-  // Estados do formulário
-  const [formData, setFormData] = useState({ name: '', email: '', password: '' });
-  const [isSubmitting, setIsSubmitting] = useState(false);
+export default function LoginPage() {
+  const supabase = createClient();
+  const [isLogin, setIsLogin] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [emailError, setEmailError] = useState<string | null>(null);
 
-  const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-
-    if (name === 'email') {
-      if (value && !value.endsWith('@edu.unirio.br')) {
-        setEmailError('O e-mail deve ser do domínio @edu.unirio.br');
-      } else {
-        setEmailError(null);
-      }
-    }
-  };
-
-  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
+  const handleAuthAction = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (emailError) return;
-
-    setIsSubmitting(true);
+    setLoading(true);
     setError(null);
     setSuccess(null);
-    const supabase = createClient();
 
-    try {
-      if (mode === 'cadastro') {
-        // Lógica de Cadastro
-        const { data, error: signUpError } = await supabase.auth.signUp({
-          email: formData.email,
-          password: formData.password,
-          options: {
-            data: {
-              full_name: formData.name, // Adiciona o nome aos metadados do usuário
-            },
-            emailRedirectTo: `${window.location.origin}/`,
-          },
-        });
-        if (signUpError) throw signUpError;
-        setSuccess('Cadastro realizado! Verifique seu e-mail para confirmar a conta.');
+    const formData = new FormData(e.currentTarget);
+    const email = formData.get('email') as string;
+    const password = formData.get('password') as string;
+    const firstName = formData.get('firstName') as string;
+    const lastName = formData.get('lastName') as string;
 
+
+    if (isLogin) {
+      // Lógica de Login
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) {
+        setError(error.message);
       } else {
-        // Lógica de Login
-        const { error: signInError } = await supabase.auth.signInWithPassword({
-          email: formData.email,
-          password: formData.password,
-        });
-        if (signInError) throw signInError;
-        // Se o login for bem-sucedido, o ideal é redirecionar o usuário.
-        // Por agora, vamos apenas mostrar uma mensagem de sucesso.
-        setSuccess('Login bem-sucedido! Redirecionando...');
-        // window.location.href = '/dashboard'; // Exemplo de redirecionamento
+        window.location.href = '/dashboard';
       }
-      setFormData({ name: '', email: '', password: '' });
-    } catch (err: any) {
-      console.error("ERRO DETECTADO:", err);
-      setError(err.message || 'Ocorreu um erro. Tente novamente.');
-    } finally {
-      setIsSubmitting(false);
+    } else {
+      // Lógica de Cadastro
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            first_name: firstName,
+            last_name: lastName,
+          },
+        },
+      });
+      if (error) {
+        setError(error.message);
+      } else {
+        setSuccess('Cadastro realizado! Verifique o seu e-mail para confirmar a conta.');
+      }
     }
-  };
-
-  const toggleMode = () => {
-    setMode(mode === 'login' ? 'cadastro' : 'login');
-    setError(null);
-    setSuccess(null);
+    setLoading(false);
   };
 
   return (
-    <main className="flex min-h-screen w-full items-center justify-center bg-gradient-to-br from-indigo-900 to-purple-900 p-4">
-      <div className="w-full max-w-md rounded-2xl border border-white/20 bg-white/10 p-8 shadow-2xl backdrop-blur-lg">
-        <div className="text-center">
-          <h1 className="text-3xl font-bold text-white">
-            {mode === 'login' ? 'Acessar Conta' : 'Criar Conta'}
-          </h1>
-          <p className="mt-2 text-purple-200">Use seu e-mail da faculdade para continuar.</p>
-        </div>
+    <main className="relative min-h-screen w-full flex items-center justify-center bg-gradient-to-br from-indigo-900 to-purple-900 p-4">
+      <Link href="/" className="absolute top-6 left-6 text-white/70 hover:text-white transition-colors">
+        <ArrowLeft className="h-8 w-8" />
+      </Link>
 
-        <form onSubmit={handleSubmit} className="mt-8 space-y-4">
-          {/* Campo NOME: aparece apenas no modo cadastro */}
-          {mode === 'cadastro' && (
-            <div>
-              <label htmlFor="name" className="text-sm font-medium text-purple-200">Nome Completo</label>
-              <input id="name" name="name" type="text" required value={formData.name} onChange={handleChange}
-                className="mt-1 block w-full appearance-none rounded-lg border border-white/20 bg-white/5 px-3 py-2 text-white placeholder-purple-300 shadow-sm focus:border-purple-400 focus:outline-none focus:ring-purple-400 sm:text-sm"
-              />
+      <div className="w-full max-w-md">
+        <div className="rounded-2xl border border-white/20 bg-white/10 p-8 shadow-2xl backdrop-blur-lg">
+          <h1 className="text-3xl font-bold text-center text-white mb-2">{isLogin ? 'Login' : 'Crie a sua Conta'}</h1>
+          <p className="text-center text-white/70 mb-6">
+            {isLogin ? 'Bem-vindo(a) de volta!' : 'Use o seu e-mail da faculdade para começar.'}
+          </p>
+
+          <form onSubmit={handleAuthAction} className="space-y-4">
+            {!isLogin && (
+              <div className="flex gap-4">
+                <input
+                  name="firstName"
+                  type="text"
+                  required
+                  placeholder="Nome"
+                  className="w-full rounded-lg bg-white/10 p-3 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                />
+                <input
+                  name="lastName"
+                  type="text"
+                  required
+                  placeholder="Sobrenome"
+                  className="w-full rounded-lg bg-white/10 p-3 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                />
+              </div>
+            )}
+            <input
+              name="email"
+              type="email"
+              required
+              placeholder="E-mail institucional"
+              className="w-full rounded-lg bg-white/10 p-3 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
+            />
+            <input
+              name="password"
+              type="password"
+              required
+              placeholder="Senha"
+              minLength={6}
+              className="w-full rounded-lg bg-white/10 p-3 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
+            />
+            
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full flex items-center justify-center gap-2 rounded-lg bg-purple-600 px-4 py-3 text-base font-bold text-white transition-all hover:bg-purple-700 disabled:opacity-50"
+            >
+              {loading && <Loader2 className="h-5 w-5 animate-spin" />}
+              {isLogin ? 'Entrar' : 'Cadastrar'}
+            </button>
+          </form>
+
+          {error && (
+            <div className="mt-4 flex items-center gap-2 rounded-lg bg-red-500/30 p-3 text-sm text-red-300">
+              <AlertTriangle className="h-5 w-5" />
+              <span>{error}</span>
             </div>
           )}
 
-          {/* Campo EMAIL */}
-          <div>
-            <label htmlFor="email" className="text-sm font-medium text-purple-200">E-mail Institucional</label>
-            <input id="email" name="email" type="email" required value={formData.email} onChange={handleChange}
-              className="mt-1 block w-full appearance-none rounded-lg border border-white/20 bg-white/5 px-3 py-2 text-white placeholder-purple-300 shadow-sm focus:border-purple-400 focus:outline-none focus:ring-purple-400 sm:text-sm"
-            />
-            {emailError && <p className="mt-1 text-xs text-red-400">{emailError}</p>}
-          </div>
+          {success && (
+            <div className="mt-4 flex items-center gap-2 rounded-lg bg-green-500/30 p-3 text-sm text-green-300">
+              <CheckCircle2 className="h-5 w-5" />
+              <span>{success}</span>
+            </div>
+          )}
 
-          {/* Campo SENHA */}
-          <div>
-            <label htmlFor="password" className="text-sm font-medium text-purple-200">Senha</label>
-            <input id="password" name="password" type="password" required minLength={6} value={formData.password} onChange={handleChange}
-              className="mt-1 block w-full appearance-none rounded-lg border border-white/20 bg-white/5 px-3 py-2 text-white placeholder-purple-300 shadow-sm focus:border-purple-400 focus:outline-none focus:ring-purple-400 sm:text-sm"
-            />
-          </div>
-
-          <div>
-            <button type="submit" disabled={isSubmitting || !!emailError}
-              className="mt-2 flex w-full justify-center rounded-lg bg-purple-600 px-4 py-2.5 text-sm font-semibold text-white shadow-md transition-all duration-300 hover:bg-purple-700 disabled:cursor-not-allowed disabled:opacity-50">
-              {isSubmitting ? 'Processando...' : (mode === 'login' ? 'Entrar' : 'Criar conta')}
+          <p className="mt-6 text-center text-sm text-white/70">
+            {isLogin ? 'Não tem uma conta?' : 'Já tem uma conta?'}
+            <button onClick={() => setIsLogin(!isLogin)} className="font-bold text-purple-300 hover:underline ml-2">
+              {isLogin ? 'Cadastre-se' : 'Faça login'}
             </button>
-          </div>
-        </form>
-
-        <div className="mt-6 text-center text-sm">
-          <button onClick={toggleMode} className="font-medium text-purple-300 hover:text-purple-200">
-            {mode === 'login' ? 'Não tem uma conta? Cadastre-se' : 'Já tem uma conta? Faça login'}
-          </button>
+          </p>
         </div>
-
-        {error && (
-          <div className="mt-6 flex items-center space-x-3 rounded-lg bg-red-500/20 p-3">
-            <AlertTriangle className="h-5 w-5 flex-shrink-0 text-red-400" />
-            <p className="text-sm text-red-300">{error}</p>
-          </div>
-        )}
-        {success && (
-          <div className="mt-6 flex items-center space-x-3 rounded-lg bg-green-500/20 p-3">
-            <CheckCircle2 className="h-5 w-5 flex-shrink-0 text-green-400" />
-            <p className="text-sm text-green-300">{success}</p>
-          </div>
-        )}
       </div>
     </main>
   );
-};
-
-export default LoginPage;
+}
 
